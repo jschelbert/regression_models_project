@@ -25,3 +25,14 @@ fit4a <- lm(mpg ~ am + cyl + hp, data = mtcars)
 fit5a <- lm(mpg ~ am + cyl + hp + wt, data = mtcars)
 anova(fit1, fit2, fit4a, fit5a)
 ```
+
+# load swiss data and
+data(swiss)
+# run linear regression on Fertility vs all other predictors
+fit <- lm(Fertility ~ . , data = swiss)
+# generate diagnostic plots in 2 x 2 panels
+par(mfrow = c(2, 2)); plot(fit)
+
+http://docs.ggplot2.org/0.9.3.1/fortify.lm.html
+https://rpubs.com/therimalaya/43190
+
