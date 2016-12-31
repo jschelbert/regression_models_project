@@ -1,38 +1,135 @@
 ---
-title: "Analyzing the influnce of automatic transmission on miles per gallon"
+title: "Analyzing the influnce of automatic transmission on miles per gallon in the *mtcars* data"
+subtitle: "Project for *Regression Models*"
 author: "Jakob Schelbert"
-date: "22 12 2016"
+date: "30.12.2016"
 output: pdf_document
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 1, digits = 3)
+library(dplyr)
+library(ggplot2)
+library(data.table)
+library(knitr)
+set.seed(1337)
 ```
 
-```{r cars}
-summary(mtcars)
+# Executive Summary
+We analyze the data provided in the `mtcars` package that comprises of fuel consumption and ten other aspects of 32 automobiles and is taken from the 1974 Motor Trend US magazine.
+In order to investigate the influence of the transmission type (manual or automatic) we use a hypothesis test and compare several linear models that try to estimate the miles per gallon by transmission type and other parameters.
+It can be shown that an automatic transmission yields a significant higher average miles per gallon value if we only use transmission as a confounding variable.
+However, if we also account for other confouding variables the significance for the influence of the transmission type vanishes.
 
-mtcars[]
 
-fit1 <- lm(mpg ~ am, data = mtcars)
-fit2 <- lm(mpg ~ am + cyl, data = mtcars)
-fit3 <- lm(mpg ~ am + cyl + disp, data = mtcars)
-fit4 <- lm(mpg ~ am + cyl + disp + hp, data = mtcars)
-fit5 <- lm(mpg ~ am + cyl + disp + hp + wt, data = mtcars)
-fit6 <- lm(mpg ~ am + cyl + disp + hp + wt + qsec, data = mtcars)
-anova(fit1, fit2, fit3, fit4, fit5, fit6)
-fit4a <- lm(mpg ~ am + cyl + hp, data = mtcars)
-fit5a <- lm(mpg ~ am + cyl + hp + wt, data = mtcars)
-anova(fit1, fit2, fit4a, fit5a)
+# Analysis
+We first do a short exploratory analysis of the data and then answer the two main questions
+
+* Is an automatic or manual transmission better for MPG?
+* What is the quantiative difference in MPG between automatic and manual transmissions?
+
+```{r dataloading, echo=FALSE}
+data("mtcars")
+dtcars <- data.table(mtcars)
+dtcars$am <- factor(dtcars$am, labels=c("manual", "automatic"))
+dtcars$cyl <- factor(dtcars$cyl)
 ```
 
-# load swiss data and
-data(swiss)
-# run linear regression on Fertility vs all other predictors
-fit <- lm(Fertility ~ . , data = swiss)
-# generate diagnostic plots in 2 x 2 panels
-par(mfrow = c(2, 2)); plot(fit)
 
-http://docs.ggplot2.org/0.9.3.1/fortify.lm.html
-https://rpubs.com/therimalaya/43190
+## Exploratory analysis
+```{r explor_analysis, echo=FALSE}
+dim_data <- dim(dtcars)
+n_transmission <- dtcars %>% group_by(am) %>% summarize(n=n())
+norm_test_all <- shapiro.test(dtcars[, mpg])
+norm_test_am0 <- shapiro.test(dtcars[am=="manual", mpg])
+norm_test_am1 <- shapiro.test(dtcars[am=="automatic", mpg])
+```
+The data set consists of `r dim_data[1]` rows and `r dim_data[2]` columns.
+There are `r n_transmission[1,2]` observations which have a manual transmission and `r n_transmission[2,2]` with an automatic one.
+The *Shapiro-Wilk* test for normality yields for both cases large p values (`r norm_test_am0$p.value` for manual and `r norm_test_am1$p.value` for automatic), thus, we fail to reject the null hypothesis and can assume a normal distribution of the data.
+
+
+## T-test on miles per gallon for different transmission types
+```{r qualitative_test, echo=FALSE}
+t_test <- t.test(mpg~am, data=dtcars)
+```
+To answer the first question we will resort to a student's t-test.
+We compare the mpg of groups with manual transmission and automatic transmission.
+A graphical representation of the data is given in Figure \ref{fig:fig1}.
+The test finds a p-value of `r t_test$p.value` and a 95% confidence interval of $[`r t_test$conf.int`]$.
+Based on that we reject the null hypothesis and conclude that the group with the automatic transmission has higher average miles per galon.
+More precisely, a manual transmission has an average mpg of `r t_test$estimate[[1]]` while an automatic yields `r t_test$estimate[[2]]`.
+This can also be observed in the linear models which are deployed in the next section.
+
+
+## Quatitative analysis of the transmission type influence
+```{r quantitative_test1, echo=FALSE}
+fit1 <- lm(mpg ~ am, data = dtcars)
+sum_fit1 <- summary(fit1)
+sumCoef <- sum_fit1$coefficients
+conf_int_fit1 <- sumCoef[2,1] + c(-1, 1) * qt(.975, df = fit1$df) * sumCoef[2, 2]
+```
+To shed some light on the quantitative influence of an automatic transmission we first fit a model that includes the indicator for the transmission type which yields the following coefficients (with corresponding additional statistical parameters)
+```{r fit1_coeftable, echo=FALSE}
+kable(sumCoef, digits = 5)
+```
+
+We observe an intercept of `r sumCoef[1,1]` which corresponds to the mean mpg for a manual transmission.
+The coefficient for automatic transmission `r sumCoef[2,1]` correspoinds to the additonal miles per gallon, meaning an automatic transmission will result a `r sumCoef[1,1] + sumCoef[2,1]` mpg on average.
+One might notice that these numbers are the same as the ones found by the t-test in the previous section.
+The 95% confidence interval for the automatic transmission coefficient is $[`r conf_int_fit1`]$, thus we can be quite confident that an automatic transmission has a positive impact on the miles per gallon within that range.
+Regression plots stated in Figure \ref{fig:fig2} show no special behaviour or pattern.
+
+In order to investigate whether this relationship remains if we add additional confounding variables, we use the R function `step` that employs a step-wise search algorithm.
+This algorithm successively adds/removes regressors one at a time to find the best model with the least Akaike Information Criterion (AIC).
+```{r quantitative_test2, echo=FALSE}
+best_fit <- step(lm(mpg ~ ., data = dtcars), k = log(nrow(dtcars)), trace=0)
+sumCoef_bf <- summary(best_fit)$coefficients
+conf_int_bestfit <- sumCoef_bf[4,1] + c(-1, 1) * qt(.975, df = best_fit$df) * sumCoef_bf[4, 2]
+```
+With this procedure we get a model that uses transmission type, weight and the 1/4 mile time to estimate the miles per gallon.
+The coeffiencts and additional statistical information it given in the subsequent table.
+```{r bestfit_coeftable, echo=FALSE}
+kable(summary(best_fit)$coefficients, digits = 5)
+```
+
+Obviously the weight of a car negatively affects the miles per gallon, while an automatic transmission and the 1/4 mile time have a positive influence on mpg.
+Compared to the model that just uses transmission type the coeffienct of the transmission is now smaller.
+We conclude that for this model that with 95% confidence an automatic transmission increases the miles per gallon in the interval $[`r conf_int_bestfit`]$.
+Regression plots for this model stated in Figure \ref{fig:fig3} show no special behaviour or pattern.
+
+
+
+# Conclusion
+We have investiated the `mtcars` data set with special emphasis on the miles per gallon in dependency of the transmission type.
+It can be shown that an automatic transmission has significant positive influence on the mpg value.
+For a model that includes only transmission type as a confounding variable we estimated an increase of `r sumCoef[2,1]`.
+A more sohpisitcated model includes also weight and 1/4 mile time as confounders.
+In this model the influence of the transmission type is `r sumCoef_bf[4,1]` increase in miles per gallon for an automatic transmission.
+
+
+# Appendix
+In the appendix we provide some additional figures and the used **R** source code.
+
+```{r explfigure, echo=FALSE, fig.width=4, fig.height=3, fig.align="center", fig.cap="\\label{fig:fig1}Boxplot showing the influence of transmission type on miles per gallon."}
+g <- ggplot(aes(y=mpg, x=am), data=dtcars)
+g + geom_boxplot(aes(fill=am)) + 
+    labs(y="Miles per gallon", 
+         x="Transmission type") + 
+    guides(fill=FALSE)
+```
+
+```{r residualplot1, echo=FALSE, fig.height=5, fig.cap="\\label{fig:fig2}Residual plot for the simple model *mpg ~ am*"}
+par(mfrow = c(2, 2)); plot(fit1)
+```
+
+```{r residualplot2, echo=FALSE, fig.height=5, fig.cap="\\label{fig:fig3}Residual plot for the best-fit model *mpg ~ am + wt + qsec*"}
+par(mfrow = c(2, 2)); plot(best_fit)
+```
+
+
+## Used **R** code
+```{r, ref.label=knitr::all_labels(), echo=TRUE, eval=FALSE}
+```
 
