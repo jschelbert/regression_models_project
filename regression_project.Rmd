@@ -2,7 +2,7 @@
 title: "Analyzing the influnce of automatic transmission on miles per gallon in the *mtcars* data"
 subtitle: "Project for *Regression Models*"
 author: "Jakob Schelbert"
-date: "30.12.2016"
+date: "31.12.2016"
 output: pdf_document
 ---
 
@@ -19,8 +19,8 @@ set.seed(1337)
 # Executive Summary
 We analyze the data provided in the `mtcars` package that comprises of fuel consumption and ten other aspects of 32 automobiles and is taken from the 1974 Motor Trend US magazine.
 In order to investigate the influence of the transmission type (manual or automatic) we use a hypothesis test and compare several linear models that try to estimate the miles per gallon by transmission type and other parameters.
-It can be shown that an automatic transmission yields a significant higher average miles per gallon value if we only use transmission as a confounding variable.
-However, if we also account for other confouding variables the significance for the influence of the transmission type vanishes.
+It can be shown that a manual transmission yields a significant higher average miles per gallon value if we only use transmission as a confounding variable.
+However, if we also account for other confouding variables the significance for the influence of the transmission type is reduced.
 
 
 # Analysis
@@ -32,7 +32,7 @@ We first do a short exploratory analysis of the data and then answer the two mai
 ```{r dataloading, echo=FALSE}
 data("mtcars")
 dtcars <- data.table(mtcars)
-dtcars$am <- factor(dtcars$am, labels=c("manual", "automatic"))
+dtcars$am <- factor(dtcars$am, labels=c("automatic", "manual"))
 dtcars$cyl <- factor(dtcars$cyl)
 ```
 
@@ -58,8 +58,8 @@ To answer the first question we will resort to a student's t-test.
 We compare the mpg of groups with manual transmission and automatic transmission.
 A graphical representation of the data is given in Figure \ref{fig:fig1}.
 The test finds a p-value of `r t_test$p.value` and a 95% confidence interval of $[`r t_test$conf.int`]$.
-Based on that we reject the null hypothesis and conclude that the group with the automatic transmission has higher average miles per galon.
-More precisely, a manual transmission has an average mpg of `r t_test$estimate[[1]]` while an automatic yields `r t_test$estimate[[2]]`.
+Based on that we reject the null hypothesis and conclude that the group with the manual transmission has higher average miles per galon.
+More precisely, an automatic transmission has an average mpg of `r t_test$estimate[[1]]` while a manual yields `r t_test$estimate[[2]]`.
 This can also be observed in the linear models which are deployed in the next section.
 
 
@@ -75,11 +75,12 @@ To shed some light on the quantitative influence of an automatic transmission we
 kable(sumCoef, digits = 5)
 ```
 
-We observe an intercept of `r sumCoef[1,1]` which corresponds to the mean mpg for a manual transmission.
-The coefficient for automatic transmission `r sumCoef[2,1]` correspoinds to the additonal miles per gallon, meaning an automatic transmission will result a `r sumCoef[1,1] + sumCoef[2,1]` mpg on average.
+We observe an intercept of `r sumCoef[1,1]` which corresponds to the mean mpg for an automatic transmission.
+The coefficient for manual transmission `r sumCoef[2,1]` correspoinds to the additonal miles per gallon, meaning a manual transmission will result a `r sumCoef[1,1] + sumCoef[2,1]` mpg on average.
 One might notice that these numbers are the same as the ones found by the t-test in the previous section.
-The 95% confidence interval for the automatic transmission coefficient is $[`r conf_int_fit1`]$, thus we can be quite confident that an automatic transmission has a positive impact on the miles per gallon within that range.
+The 95% confidence interval for the manual transmission coefficient is $[`r conf_int_fit1`]$, thus we can be quite confident that a manual transmission has a positive impact on the miles per gallon within that range.
 Regression plots stated in Figure \ref{fig:fig2} show no special behaviour or pattern.
+As this model only explains `r sum_fit1$r.squared*100`% of the variance in MPG by using the transmission type, we also look at additional confounding variables.
 
 In order to investigate whether this relationship remains if we add additional confounding variables, we use the R function `step` that employs a step-wise search algorithm.
 This algorithm successively adds/removes regressors one at a time to find the best model with the least Akaike Information Criterion (AIC).
@@ -94,19 +95,20 @@ The coeffiencts and additional statistical information it given in the subsequen
 kable(summary(best_fit)$coefficients, digits = 5)
 ```
 
-Obviously the weight of a car negatively affects the miles per gallon, while an automatic transmission and the 1/4 mile time have a positive influence on mpg.
+Obviously the weight of a car negatively affects the miles per gallon, while a manual transmission and the 1/4 mile time have a positive influence on mpg.
 Compared to the model that just uses transmission type the coeffienct of the transmission is now smaller.
-We conclude that for this model that with 95% confidence an automatic transmission increases the miles per gallon in the interval $[`r conf_int_bestfit`]$.
+We conclude that for this model that with 95% confidence a manual transmission increases the miles per gallon in the interval $[`r conf_int_bestfit`]$.
+This model explains `r summary(best_fit)$r.squared*100`% of the variance in miles per gallon by using the three variables.
 Regression plots for this model stated in Figure \ref{fig:fig3} show no special behaviour or pattern.
 
 
 
 # Conclusion
 We have investiated the `mtcars` data set with special emphasis on the miles per gallon in dependency of the transmission type.
-It can be shown that an automatic transmission has significant positive influence on the mpg value.
+It can be shown that a manual transmission has significant positive influence on the mpg value.
 For a model that includes only transmission type as a confounding variable we estimated an increase of `r sumCoef[2,1]`.
 A more sohpisitcated model includes also weight and 1/4 mile time as confounders.
-In this model the influence of the transmission type is `r sumCoef_bf[4,1]` increase in miles per gallon for an automatic transmission.
+In this model the influence of the transmission type is `r sumCoef_bf[4,1]` increase in miles per gallon for a manual transmission.
 
 
 # Appendix
